@@ -53,8 +53,8 @@ for episode in range(episodes):
             cv2.imshow("test", img)
             cv2.waitKey(50)
         lander = env.env
-        #if not done and reward < 200:
-        if not done:
+        if not done and reward < 25:
+        #if not done:
             max_future_q = np.max(q_table[new_discrete_state])
             current_q = q_table[discrete_state + (action,)]
             new_q = (1 - learning_rate) * current_q + learning_rate * (reward + discount * max_future_q)
@@ -63,8 +63,8 @@ for episode in range(episodes):
         #     print(f"We made it on episode {episode}")
         #     q_table[discrete_state + (action,)] = 0
         #elif (lander.lander.position[1] <= 0.2 and abs(lander.lander.position[0]) <= 1.0 and abs(lander.lander.velocity[0]) < 0.05 and abs(lander.lander.velocity[1]) < 0.05):
-        #elif not done and reward >= 200:
-        elif abs(new_state[0]) <= 0.1 and abs(new_state[1]) <= 0.1 and abs(new_state[2]) <= 0.05 and abs(new_state[3]) <= 0.05 and abs(new_state[4]) <= 0.1 and abs(new_state[5]) <= 0.1 and abs(new_state[6]) == True and abs(new_state[7]) == True:
+        elif not done and reward >= 25:
+        #elif abs(new_state[0]) <= 0.1 and abs(new_state[1]) <= 0.1 and abs(new_state[2]) <= 0.05 and abs(new_state[3]) <= 0.05 and abs(new_state[4]) <= 0.1 and abs(new_state[5]) <= 0.1 and abs(new_state[6]) == True and abs(new_state[7]) == True:
             print(f"We made it on episode {episode}")
             q_table[discrete_state + (action,)] = 0
             #done = True
