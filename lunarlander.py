@@ -1,77 +1,71 @@
-import gymnasium as gym
+import matplotlib.pyplot as plt
 import numpy as np
-import cv2
+import gymnasium as gym
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+import torch.distributions as distributions
+import matplotlib.pyplot as plt
+from functions import *
 
-env = gym.make("LunarLander-v2", render_mode="rgb_array")
+#Defining the environments: Test and train are required
+train_env = gym.make('LunarLander-v2')
 
-# Set up parameters
-show_every = 2000
+#Defining rest of the variables required
+input_layer_dimension = train_env.observation_space.shape[0] #Should be 8: (x, y, vx, vy, theta, omega, left leg, right leg)
+output_layer_dimension = train_env.action_space.n #Should be the actions probabilities (after softmax) so: [nothing, left engine, main engine, right engine]
+train_epochs = 10000 #No. of episodes
+gamma = 0.99
+ppo_steps_parameter = 10
+epsilon = 0.25
+test_epochs = 10
+all_rewards, loss_history_policy, loss_history_value, mean_rewards = [], [], [], []
+episode_list = []
 
-# Adjust DISCRETE_OS_SIZE based on the environment's observation space
-DISCRETE_OS_SIZE = [10] * len(env.observation_space.high)  # Adjust this based on the actual observation space
-discrete_os_win_size = (env.observation_space.high - env.observation_space.low) / DISCRETE_OS_SIZE
 
-# Create Q-table with adjusted dimensions
-q_table = np.random.uniform(low=-2, high=0, size=(DISCRETE_OS_SIZE + [env.action_space.n]))
+#Create the Neural networks and define the optimizers
+actor = Actor(input_layer_dimension, output_layer_dimension)
+critic = Critic(input_layer_dimension)
+optimizer_actor = optim.Adam(actor.parameters(), lr=0.001) #Choose the Adam Optimizer as it is the state of the art even today
+optimizer_critic = optim.Adam(critic.parameters(), lr=0.001)
 
-learning_rate = 0.1
-discount = 0.95  # How important are future actions
-episodes = 25000
-epsilon = 0.5  # Exploration vs. exploitation
-start_epsilon_decaying = 1
-end_epsilon_decaying = episodes // 2
-epsilon_decay_value = epsilon / (end_epsilon_decaying - start_epsilon_decaying)
 
-def get_discrete_state(state):
-    discrete_state = (state - env.observation_space.low) / discrete_os_win_size
-    return tuple(np.clip(discrete_state.astype(int), 0, DISCRETE_OS_SIZE[i] - 1) for i in range(len(discrete_state)))
-
-for episode in range(episodes):
-    render = False
-    if episode % show_every == 0:
-        #print(f"Episode: {episode}")
-        render = True
-    print(f"Episode: {episode}")
-    state, _ = env.reset()
-    discrete_state = get_discrete_state(state)
+#Training loop
+for epoch in range(1, train_epochs + 1):
+    states, actions, log_prob_actions, values, rewards = [], [], [], [], []
     done = False
+    episode_reward = 0
+    state, _ = train_env.reset() #Always reset before starting an episode: and note down the state
 
-    while not done:
-        if np.random.random() > epsilon:
-            action = np.argmax(q_table[discrete_state])
-        else:
-            action = np.random.randint(0, env.action_space.n)
+    
+    states, actions, log_prob_actions, values, rewards, episode_reward = episode(train_env, actor, critic, state, states, actions, log_prob_actions, values, rewards, done, episode_reward)
+    policy_loss, value_loss, optimizer_actor, optimizer_critic = ppo_update(actor, critic, optimizer_actor, optimizer_critic, rewards, gamma, ppo_steps_parameter, epsilon, values,states, actions, log_prob_actions)
 
-        # Ensure action is within valid range
-        action = np.clip(action, 0, env.action_space.n - 1)
+    # Store and print episode rewards
+    all_rewards.append(episode_reward)
+    loss_history_policy.append(policy_loss.item())  # Store policy loss
+    loss_history_value.append(value_loss.item())  # Store value loss
+    episode_list.append(epoch)
+    
+    #break if we achieve our goal. that is 200 mean reward upon 100 episodes
+    if len(all_rewards) >= 100:
+        mean_last_100 = sum(all_rewards[-100:]) / 100
+        mean_rewards.append(mean_last_100)
+        if epoch % 10 == 0:
+            print(f'Epoch: {epoch:3}, Reward: {episode_reward}, Mean of last 100: {mean_last_100}')
+        if epoch % 100 == 0:
+            episode_reward = test_loop(actor)
+        if mean_last_100 >= 200:
+            print(f"Mean of last 100 episode rewards exceeds 200 ({mean_last_100}). Stopping training.")
+            break
+        
+actor.eval()
 
-        new_state, reward, done, _, _ = env.step(action)
-        new_discrete_state = get_discrete_state(new_state)
 
-        if render:
-            img = cv2.cvtColor(env.render(), cv2.COLOR_RGB2BGR)
-            cv2.imshow("test", img)
-            cv2.waitKey(50)
-        lander = env.env
-        if not done and reward < 25:
-        #if not done:
-            max_future_q = np.max(q_table[new_discrete_state])
-            current_q = q_table[discrete_state + (action,)]
-            new_q = (1 - learning_rate) * current_q + learning_rate * (reward + discount * max_future_q)
-            q_table[discrete_state + (action,)] = new_q
-        # elif env.env.envs[0].lander.position[1] > 0.1:  # Check if y-position is above 0.1 for success
-        #     print(f"We made it on episode {episode}")
-        #     q_table[discrete_state + (action,)] = 0
-        #elif (lander.lander.position[1] <= 0.2 and abs(lander.lander.position[0]) <= 1.0 and abs(lander.lander.velocity[0]) < 0.05 and abs(lander.lander.velocity[1]) < 0.05):
-        elif not done and reward >= 25:
-        #elif abs(new_state[0]) <= 0.1 and abs(new_state[1]) <= 0.1 and abs(new_state[2]) <= 0.05 and abs(new_state[3]) <= 0.05 and abs(new_state[4]) <= 0.1 and abs(new_state[5]) <= 0.1 and abs(new_state[6]) == True and abs(new_state[7]) == True:
-            print(f"We made it on episode {episode}")
-            q_table[discrete_state + (action,)] = 0
-            #done = True
-        discrete_state = new_discrete_state
+# Run the agent on the test environment
+for epoch in range(1, test_epochs + 1):
+    episode_reward = test_loop(actor)
+    print(f'Test Episode {epoch}, Total Reward: {episode_reward}')
 
-    if end_epsilon_decaying >= episode >= start_epsilon_decaying:
-        epsilon -= epsilon_decay_value
-
-env.close()
-cv2.destroyAllWindows()
+plots_for_report()
