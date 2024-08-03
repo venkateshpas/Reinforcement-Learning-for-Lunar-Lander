@@ -15,57 +15,34 @@ train_env = gym.make('LunarLander-v2')
 #Defining rest of the variables required
 input_layer_dimension = train_env.observation_space.shape[0] #Should be 8: (x, y, vx, vy, theta, omega, left leg, right leg)
 output_layer_dimension = train_env.action_space.n #Should be the actions probabilities (after softmax) so: [nothing, left engine, main engine, right engine]
-train_epochs = 10000 #No. of episodes
+train_epochs = 100000 #No. of episodes
 gamma = 0.99
 ppo_steps_parameter = 10
 epsilon = 0.25
 test_epochs = 10
-all_rewards, loss_history_policy, loss_history_value, mean_rewards = [], [], [], []
+all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes = [], [], [], [], []
 episode_list = []
 
+# gamma
+# ppo_steps_parameter
+# epsilon
 
-#Create the Neural networks and define the optimizers
-actor = Actor(input_layer_dimension, output_layer_dimension)
-critic = Critic(input_layer_dimension)
-optimizer_actor = optim.Adam(actor.parameters(), lr=0.001) #Choose the Adam Optimizer as it is the state of the art even today
-optimizer_critic = optim.Adam(critic.parameters(), lr=0.001)
+# episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes = training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, gamma, ppo_steps_parameter, epsilon, test_epochs, all_rewards, loss_history_policy, loss_history_value, mean_rewards,episode_list, mean_episodes, train_env)
 
+# plots_for_one_training_cycle(episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes)
 
-#Training loop
-for epoch in range(1, train_epochs + 1):
-    states, actions, log_prob_actions, values, rewards = [], [], [], [], []
-    done = False
-    episode_reward = 0
-    state, _ = train_env.reset() #Always reset before starting an episode: and note down the state
+#plots_for_one_training_cycle(episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards)
 
-    
-    states, actions, log_prob_actions, values, rewards, episode_reward = episode(train_env, actor, critic, state, states, actions, log_prob_actions, values, rewards, done, episode_reward)
-    policy_loss, value_loss, optimizer_actor, optimizer_critic = ppo_update(actor, critic, optimizer_actor, optimizer_critic, rewards, gamma, ppo_steps_parameter, epsilon, values,states, actions, log_prob_actions)
+gamma_list = [0.99,0.98,0.97,0.96]#, 0.98, 0.97, 0.96, 0.95, 0.94, 0.93, 0.92, 0.91, 0.9] #Keep the length even always as plots code is written considering it to be even
+all_rewards_loop = dict()
+mean_rewards_loop = dict()
+episode_list_loop = dict()
 
-    # Store and print episode rewards
-    all_rewards.append(episode_reward)
-    loss_history_policy.append(policy_loss.item())  # Store policy loss
-    loss_history_value.append(value_loss.item())  # Store value loss
-    episode_list.append(epoch)
-    
-    #break if we achieve our goal. that is 200 mean reward upon 100 episodes
-    if len(all_rewards) >= 100:
-        mean_last_100 = sum(all_rewards[-100:]) / 100
-        mean_rewards.append(mean_last_100)
-        if epoch % 10 == 0:
-            print(f'Epoch: {epoch:3}, Reward: {episode_reward}, Mean of last 100: {mean_last_100}')
-        if epoch % 100 == 0:
-            episode_reward = test_loop(actor)
-        if mean_last_100 >= 200:
-            print(f"Mean of last 100 episode rewards exceeds 200 ({mean_last_100}). Stopping training.")
-            break
-        
-actor.eval()
+for gamma in gamma_list:
+    episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes = training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, gamma, ppo_steps_parameter, epsilon, test_epochs, all_rewards, loss_history_policy, loss_history_value, mean_rewards,episode_list, mean_episodes, train_env)
+    #all_rewards_loop[gamma] = all_rewards
+    mean_rewards_loop[gamma] = mean_rewards
+    episode_list_loop[gamma] = mean_episodes
 
-
-# Run the agent on the test environment
-for epoch in range(1, test_epochs + 1):
-    episode_reward = test_loop(actor)
-    print(f'Test Episode {epoch}, Total Reward: {episode_reward}')
-
-plots_for_report()
+varied = "Gamma"
+plots_for_multiple_training_cycle(gamma_list, episode_list_loop, mean_rewards_loop, varied)

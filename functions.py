@@ -177,21 +177,116 @@ def test_loop(actor):
     test_env.close()
     return episode_reward
 
-def plots_for_report(episode_list, all_rewards, loss_history_policy, loss_history_value):
-    plt.plot(episode_list,all_rewards)
-    plt.xlabel('Episode Number')
-    plt.ylabel('Episode Reward')
-    plt.legend()
+def training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, gamma, ppo_steps_parameter, epsilon, test_epochs, all_rewards, loss_history_policy, loss_history_value, mean_rewards,episode_list, mean_episodes, train_env):
+    
+    actor = Actor(input_layer_dimension, output_layer_dimension)
+    critic = Critic(input_layer_dimension)
+    optimizer_actor = optim.Adam(actor.parameters(), lr=0.001) #Choose the Adam Optimizer as it is the state of the art even today
+    optimizer_critic = optim.Adam(critic.parameters(), lr=0.001)
+
+    
+    for epoch in range(1, train_epochs + 1):
+        states, actions, log_prob_actions, values, rewards = [], [], [], [], []
+        done = False
+        episode_reward = 0
+        state, _ = train_env.reset() #Always reset before starting an episode: and note down the state
+
+        
+        states, actions, log_prob_actions, values, rewards, episode_reward = episode(train_env, actor, critic, state, states, actions, log_prob_actions, values, rewards, done, episode_reward)
+        policy_loss, value_loss, optimizer_actor, optimizer_critic = ppo_update(actor, critic, optimizer_actor, optimizer_critic, rewards, gamma, ppo_steps_parameter, epsilon, values,states, actions, log_prob_actions)
+
+        # Store and print episode rewards
+        all_rewards.append(episode_reward)
+        loss_history_policy.append(policy_loss.item())  # Store policy loss
+        loss_history_value.append(value_loss.item())  # Store value loss
+        episode_list.append(epoch)
+            
+        #break if we achieve our goal. that is 200 mean reward upon 100 episodes
+        if len(all_rewards) >= 100:
+            mean_last_100 = sum(all_rewards[-100:]) / 100
+            mean_episodes.append(epoch)
+            mean_rewards.append(mean_last_100)
+            # if epoch % 10 == 0:
+            if epoch % 100 == 0:
+                print(f'Epoch: {epoch:3}, Reward: {episode_reward}, Mean of last 100: {mean_last_100}')
+            # if epoch % 100 == 0:
+            #     episode_reward = test_loop(actor)
+            if mean_last_100 >= 200:
+                print(f"Mean of last 100 episode rewards exceeds 200 ({mean_last_100}). Stopping training.")
+                break
+            
+    actor.eval()
+
+    # Run the agent on the test environment
+    # for epoch in range(1, test_epochs + 1):
+    #     episode_reward = test_loop(actor)
+    #     print(f'Test Episode {epoch}, Total Reward: {episode_reward}')
+    
+    return episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes
+    
+
+def plots_for_one_training_cycle(episode_list, all_rewards, loss_history_policy, loss_history_value,mean_rewards, mean_episodes):
+    fig, axs = plt.subplots(2,2, figsize=(12,8))
+    
+    axs[0,0].plot(episode_list, all_rewards)
+    axs[0, 0].set_title("Variation of reward with episodes")
+    axs[0, 0].set_xlabel("Episode Numbers")
+    axs[0, 0].set_ylabel("Reward per episode")
+    
+    axs[0,1].plot(mean_episodes, mean_rewards)
+    axs[0,1].set_title("Variation of avg reward per 100 episodes with episodes")
+    axs[0,1].set_xlabel("Episode Numbers")
+    axs[0,1].set_ylabel("Average Reward for 100 previous episodes")
+    
+    axs[1,0].plot(episode_list, loss_history_policy)
+    axs[1,0].set_title("Variation of policy with episodes")
+    axs[1,0].set_xlabel("Episode Numbers")
+    axs[1,0].set_ylabel("Loss history policy")
+    
+    axs[1,1].plot(episode_list, loss_history_value)
+    axs[1,1].set_title("Variation of loss value with episodes")
+    axs[1,1].set_xlabel("Episode Numbers")
+    axs[1,1].set_ylabel("Loss history value")
+    
+    fig.suptitle("Analysis of the agents performance for a training cycle")
+    plt.tight_layout()
+
+    # Show the plot
     plt.show()
 
-    plt.plot(episode_list,loss_history_policy)
-    plt.xlabel('Episode Number')
-    plt.ylabel('Loss history policy')
-    plt.legend()
-    plt.show()
+def plots_for_multiple_training_cycle(varied_list, episode_list_loop, mean_rewards_loop, varied):
+    fig, axs = plt.subplots(int(len(varied_list)/2),2, figsize=(12,8))
+    row = []
+    for i in range(0,int(len(varied_list)/2)):
+        row.append(i)
+    print(row)
+    col = [0,1]
+    count = 0
+    for i in row:
+        for j in col:
+            axs[i,j].plot(episode_list_loop[varied_list[count]], mean_rewards_loop[varied_list[count]])
+            axs[i,j].set_title(f"For {varied}: {varied_list[count]} Variation of avg reward per 100 episodes with episodes")
+            axs[i,j].set_xlabel("Episode Numbers")
+            axs[i,j].set_ylabel("Average Reward for 100 previous episodes")
+            count += 1
 
-    plt.plot(episode_list,loss_history_value)
-    plt.xlabel('Episode Number')
-    plt.ylabel('Loss history value')
-    plt.legend()
+    # axs[0,1].plot(mean_episodes, mean_rewards)
+    # axs[0,1].set_title("Variation of avg reward per 100 episodes with episodes")
+    # axs[0,1].set_xlabel("Episode Numbers")
+    # axs[0,1].set_ylabel("Average Reward for 100 previous episodes")
+    
+    # axs[1,0].plot(episode_list, loss_history_policy)
+    # axs[1,0].set_title("Variation of policy with episodes")
+    # axs[1,0].set_xlabel("Episode Numbers")
+    # axs[1,0].set_ylabel("Loss history policy")
+    
+    # axs[1,1].plot(episode_list, loss_history_value)
+    # axs[1,1].set_title("Variation of loss value with episodes")
+    # axs[1,1].set_xlabel("Episode Numbers")
+    # axs[1,1].set_ylabel("Loss history value")
+    
+    fig.suptitle("Analysis of the agents performance for a training cycle")
+    plt.tight_layout()
+
+    # Show the plot
     plt.show()
