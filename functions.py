@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import torch.distributions as distributions
 import matplotlib.pyplot as plt
 from functions import *
+import pandas as pd
 
 
 #Defining the neural networks architecture: Actor, Critic model
@@ -177,8 +178,9 @@ def test_loop(actor):
     test_env.close()
     return episode_reward
 
-def training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, gamma, ppo_steps_parameter, epsilon, test_epochs, all_rewards, loss_history_policy, loss_history_value, mean_rewards,episode_list, mean_episodes, train_env):
-    
+def training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, gamma, ppo_steps_parameter, epsilon, test_epochs, train_env):
+    all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes = [], [], [], [], []
+    episode_list = []
     actor = Actor(input_layer_dimension, output_layer_dimension)
     critic = Critic(input_layer_dimension)
     optimizer_actor = optim.Adam(actor.parameters(), lr=0.001) #Choose the Adam Optimizer as it is the state of the art even today
@@ -207,7 +209,7 @@ def training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, 
             mean_episodes.append(epoch)
             mean_rewards.append(mean_last_100)
             # if epoch % 10 == 0:
-            if epoch % 100 == 0:
+            if epoch % 10 == 0:
                 print(f'Epoch: {epoch:3}, Reward: {episode_reward}, Mean of last 100: {mean_last_100}')
             # if epoch % 100 == 0:
             #     episode_reward = test_loop(actor)
@@ -217,6 +219,8 @@ def training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, 
             
     actor.eval()
 
+    torch.save(actor.state_dict(), 'actor_model.pth')
+    torch.save(critic.state_dict(), 'critic_model.pth')
     # Run the agent on the test environment
     # for epoch in range(1, test_epochs + 1):
     #     episode_reward = test_loop(actor)
@@ -227,7 +231,20 @@ def training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, 
 
 def plots_for_one_training_cycle(episode_list, all_rewards, loss_history_policy, loss_history_value,mean_rewards, mean_episodes):
     fig, axs = plt.subplots(2,2, figsize=(12,8))
-    
+
+    episode_list_pd = pd.DataFrame(episode_list, columns=['Episode List'])
+    episode_list_pd.to_csv('data/single_training/episode_list.csv')
+    all_rewards_pd = pd.DataFrame(all_rewards, columns=['All Rewards'])
+    all_rewards_pd.to_csv('data/single_training/all_rewards.csv')
+    mean_rewards_pd = pd.DataFrame(mean_rewards, columns=['Mean Rewards'])
+    mean_rewards_pd.to_csv('data/single_training/mean_rewards.csv')
+    mean_episodes_pd = pd.DataFrame(mean_episodes, columns=['Mean Episodes'])
+    mean_episodes_pd.to_csv('data/single_training/mean_episodes.csv')
+    loss_history_policy_pd = pd.DataFrame(loss_history_policy, columns=['Loss History Policy'])
+    loss_history_policy_pd.to_csv('data/single_training/loss_history_policy.csv')
+    loss_history_value_pd = pd.DataFrame(loss_history_value, columns=['Loss History Value'])
+    loss_history_value_pd.to_csv('data/single_training/loss_history_value.csv')
+
     axs[0,0].plot(episode_list, all_rewards)
     axs[0, 0].set_title("Variation of reward with episodes")
     axs[0, 0].set_xlabel("Episode Numbers")
@@ -255,20 +272,30 @@ def plots_for_one_training_cycle(episode_list, all_rewards, loss_history_policy,
     plt.show()
 
 def plots_for_multiple_training_cycle(varied_list, episode_list_loop, mean_rewards_loop, varied):
-    fig, axs = plt.subplots(int(len(varied_list)/2),2, figsize=(12,8))
-    row = []
-    for i in range(0,int(len(varied_list)/2)):
-        row.append(i)
-    print(row)
-    col = [0,1]
-    count = 0
-    for i in row:
-        for j in col:
-            axs[i,j].plot(episode_list_loop[varied_list[count]], mean_rewards_loop[varied_list[count]])
-            axs[i,j].set_title(f"For {varied}: {varied_list[count]} Variation of avg reward per 100 episodes with episodes")
-            axs[i,j].set_xlabel("Episode Numbers")
-            axs[i,j].set_ylabel("Average Reward for 100 previous episodes")
-            count += 1
+    
+
+
+    fig, ax = plt.subplots(figsize=(12, 8)) 
+    for count in range(len(varied_list)):
+        ax.plot(episode_list_loop[varied_list[count]], mean_rewards_loop[varied_list[count]], label=f"{varied}: {varied_list[count]}")
+    # Set the title and labels for the axes
+    ax.set_title(f"Variation of avg reward per 100 episodes with episodes for different {varied}")
+    ax.set_xlabel("Episode Numbers")
+    ax.set_ylabel("Average Reward for 100 previous episodes")
+    ax.legend()
+    # fig, axs = plt.subplots(int(len(varied_list)/2),2, figsize=(12,8), squeeze=False)
+    # row = []
+    # for i in range(0,int(len(varied_list)/2)):
+    #     row.append(i)
+    # col = [0,1]
+    # count = 0
+    # for i in row:
+    #     for j in col:
+    #         axs[i,j].plot(episode_list_loop[varied_list[count]], mean_rewards_loop[varied_list[count]])
+    #         axs[i,j].set_title(f"For {varied}: {varied_list[count]} Variation of avg reward per 100 episodes with episodes")
+    #         axs[i,j].set_xlabel("Episode Numbers")
+    #         axs[i,j].set_ylabel("Average Reward for 100 previous episodes")
+    #         count += 1
 
     # axs[0,1].plot(mean_episodes, mean_rewards)
     # axs[0,1].set_title("Variation of avg reward per 100 episodes with episodes")
@@ -285,7 +312,6 @@ def plots_for_multiple_training_cycle(varied_list, episode_list_loop, mean_rewar
     # axs[1,1].set_xlabel("Episode Numbers")
     # axs[1,1].set_ylabel("Loss history value")
     
-    fig.suptitle("Analysis of the agents performance for a training cycle")
     plt.tight_layout()
 
     # Show the plot
