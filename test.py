@@ -22,14 +22,14 @@ epsilon = 0.25
 test_epochs = 10
 
 actor = Actor(input_layer_dimension, output_layer_dimension)
-critic = Critic(input_layer_dimension)
+# critic = Critic(input_layer_dimension)
 
 actor.load_state_dict(torch.load('actor_model.pth'))
-critic.load_state_dict(torch.load('critic_model.pth'))
+# critic.load_state_dict(torch.load('critic_model.pth'))
 
 # Set the models to evaluation mode (this disables dropout layers, etc.)
 actor.eval()
-critic.eval()
+# critic.eval()
 
 # Run the agent on the test environment
 for epoch in range(1, test_epochs + 1):
