@@ -10,7 +10,7 @@ The files in the repository are as explained:
 4. single_iteration.py: In this Python file, a single iteration with a random set of hyperparameters is performed to train the agent to obtain a reliable landing solution.
 5. hyperparameter_tuning.py: This is the code where the variation of hyperparameters is performed and the plots obtained through this are included in the report.
 6. best_solution.py: Depending on the hyperparameters tuning, a single iteration is performed to train the agent to obtain the best landing solution.
-7. test.py: Based on the hyperparameters, the learned parameters for the neural network are saved, and using this test.py Python file, the final result can be visualized without running the entire training process.
+7. test.py: Based on the hyperparameters, the learned parameters for the neural network are saved, and using this test.py Python file, the final result can be visualized without running the entire training process. The parameters are saved in the accompanying .pth files.
 
 
 ** Note: Re-training might not produce the same results as the agent learns best on the current conditions that the environment gives it and hence replicability is not guaranteed even after many runs.
