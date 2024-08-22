@@ -21,7 +21,5 @@ ppo_steps_parameter = 10
 epsilon = 0.25
 test_epochs = 10
 
-
 episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes = training_cycle(input_layer_dimension, output_layer_dimension, train_epochs, gamma, ppo_steps_parameter, epsilon, test_epochs, train_env)
-
 plots_for_one_training_cycle(episode_list, all_rewards, loss_history_policy, loss_history_value, mean_rewards, mean_episodes)
